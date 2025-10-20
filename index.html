@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pomodoro Planner</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="timer-panel">
+        <header class="panel-header">
+          <h1>Pomodoro Focus Timer</h1>
+          <p class="subtitle">
+            Stay on task with configurable focus and break durations. Completed
+            focus sessions are tracked on the daily timeline.
+          </p>
+        </header>
+
+        <div class="timer-meta">
+          <span id="phase-label" class="phase-badge">Focus Session</span>
+          <span id="upcoming-label" class="upcoming-text"></span>
+        </div>
+
+        <div class="timer-display" aria-live="polite">
+          <span id="minutes">25</span>
+          <span class="separator">:</span>
+          <span id="seconds">00</span>
+        </div>
+
+        <div class="button-row">
+          <button id="start" class="primary" type="button">Start Focus</button>
+          <button id="pause" class="secondary" type="button" disabled>Pause</button>
+          <button id="reset" class="ghost" type="button">Reset</button>
+        </div>
+
+        <section class="settings" aria-labelledby="settings-title">
+          <h2 id="settings-title">Session durations</h2>
+          <form id="settings-form" class="settings-form">
+            <label class="settings-field">
+              <span>Focus length (minutes)</span>
+              <input
+                id="focus-duration"
+                name="focus"
+                type="number"
+                min="1"
+                max="180"
+                step="1"
+                inputmode="numeric"
+              />
+            </label>
+            <label class="settings-field">
+              <span>Short break (minutes)</span>
+              <input
+                id="short-break-duration"
+                name="shortBreak"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                inputmode="numeric"
+              />
+            </label>
+            <label class="settings-field">
+              <span>Long break (minutes)</span>
+              <input
+                id="long-break-duration"
+                name="longBreak"
+                type="number"
+                min="1"
+                max="90"
+                step="1"
+                inputmode="numeric"
+              />
+            </label>
+          </form>
+          <p class="settings-hint">
+            A long break starts automatically after every fourth focus session.
+            Adjust the lengths above to fit your routine.
+          </p>
+        </section>
+
+        <div class="stats">
+          <div>
+            <h2>Focus sessions completed today</h2>
+            <p id="sessions-count" class="highlight">0</p>
+          </div>
+        </div>
+
+        <div
+          id="status-banner"
+          class="status-banner"
+          role="status"
+          aria-live="polite"
+        ></div>
+      </section>
+
+      <section class="calendar-panel" aria-labelledby="calendar-title">
+        <header class="panel-header">
+          <div class="calendar-heading">
+            <p class="calendar-date" id="calendar-date"></p>
+            <h2 id="calendar-title">Morning timeline</h2>
+            <p class="subtitle">
+              Focus sessions between 8:00 AM and 12:00 PM are pinned to the
+              timeline below.
+            </p>
+          </div>
+        </header>
+
+        <div class="timeline" id="calendar-rows" role="list"></div>
+      </section>
+    </main>
+
+    <template id="hour-row-template">
+      <div class="hour-row" role="listitem">
+        <span class="hour-label"></span>
+        <div class="hour-track">
+          <div class="hour-line" aria-hidden="true"></div>
+          <div class="session-chips" role="list"></div>
+        </div>
+        <div class="hour-count" aria-live="polite">0</div>
+      </div>
+    </template>
+
+    <script src="script.js" type="module"></script>
+  </body>
+</html>
