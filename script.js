@@ -3,6 +3,7 @@ const SETTINGS_KEY = 'pomodoro-settings-v1';
 const START_HOUR = 8;
 const END_HOUR = 12; // exclusive
 const LONG_BREAK_INTERVAL = 4;
+const DAY_ROLLOVER_INTERVAL_MS = 60_000;
 
 const DEFAULT_SETTINGS = {
   focus: 25,
@@ -19,7 +20,10 @@ const state = {
   focusSessionsToday: 0,
   focusSessionsInCycle: 0,
   durations: { ...DEFAULT_SETTINGS },
+  dateKey: currentDateKey(),
 };
+
+let statusTimeoutId = null;
 
 const minutesEl = document.getElementById('minutes');
 const secondsEl = document.getElementById('seconds');
@@ -36,13 +40,16 @@ const settingsForm = document.getElementById('settings-form');
 const focusInput = document.getElementById('focus-duration');
 const shortBreakInput = document.getElementById('short-break-duration');
 const longBreakInput = document.getElementById('long-break-duration');
+const statusBanner = document.getElementById('status-banner');
 
 initSettings();
 initCalendar();
-restoreState();
+loadDayState(state.dateKey);
 updateTimerDisplay(state.remainingSeconds);
 updatePhaseDisplay();
 updateCalendarDate();
+scheduleDayRolloverCheck();
+showStatus('');
 
 startButton.addEventListener('click', handleStart);
 pauseButton.addEventListener('click', handlePauseToggle);
@@ -52,6 +59,10 @@ settingsForm.addEventListener('input', handleSettingsChange);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.isRunning) {
     state.lastTick = Date.now();
+  }
+
+  if (!document.hidden) {
+    ensureTodayState({ announce: true });
   }
 });
 
@@ -98,6 +109,7 @@ function handleReset() {
   pauseButton.textContent = 'Pause';
   updateTimerDisplay(state.remainingSeconds);
   updatePhaseDisplay();
+  showStatus('');
 }
 
 function handleSettingsChange(event) {
@@ -159,8 +171,8 @@ function completePhase() {
   state.lastTick = null;
 
   if (state.phase === 'focus') {
-    state.focusSessionsToday = recordCompletedSession();
-    sessionsCountEl.textContent = state.focusSessionsToday.toString();
+    const totalToday = recordCompletedSession();
+    refreshFocusCount(totalToday);
     state.focusSessionsInCycle += 1;
     const useLongBreak = state.focusSessionsInCycle >= LONG_BREAK_INTERVAL;
     if (useLongBreak) {
@@ -281,22 +293,18 @@ function initCalendar() {
   }
 }
 
-function restoreState() {
+function loadDayState(key) {
   const sessionsByDay = loadSessions();
-  const todayKey = currentDateKey();
-  const data = sessionsByDay[todayKey] ?? createEmptySlots();
-
+  const data = sessionsByDay[key] ?? createEmptySlots();
   updateCalendar(data);
-  state.focusSessionsToday = Object.values(data).reduce(
-    (sum, count) => sum + count,
-    0,
-  );
-  sessionsCountEl.textContent = state.focusSessionsToday.toString();
+  const totalToday = countSessions(data);
+  refreshFocusCount(totalToday);
 }
 
 function recordCompletedSession() {
+  ensureTodayState();
   const sessionsByDay = loadSessions();
-  const key = currentDateKey();
+  const key = state.dateKey;
 
   if (!sessionsByDay[key]) {
     sessionsByDay[key] = createEmptySlots();
@@ -309,14 +317,16 @@ function recordCompletedSession() {
     sessionsByDay[key][slotHour] += 1;
     saveSessions(sessionsByDay);
     updateCalendar(sessionsByDay[key]);
+    showStatus(`Focus session logged for ${formatHourLabel(slotHour)}.`, 'success');
     announceSessionCompletion(slotHour);
-    return Object.values(sessionsByDay[key]).reduce((sum, count) => sum + count, 0);
+    return countSessions(sessionsByDay[key]);
   }
 
-  alert(
+  showStatus(
     'Session completed outside of 8 AM – 12 PM. It will not appear in the morning timeline.',
+    'info',
   );
-  return Object.values(sessionsByDay[key]).reduce((sum, count) => sum + count, 0);
+  return countSessions(sessionsByDay[key]);
 }
 
 function updateCalendar(data) {
@@ -345,6 +355,39 @@ function updateCalendar(data) {
   });
 }
 
+function refreshFocusCount(total) {
+  state.focusSessionsToday = total;
+  sessionsCountEl.textContent = total.toString();
+}
+
+function countSessions(slots) {
+  return Object.values(slots).reduce((sum, count) => sum + count, 0);
+}
+
+function showStatus(message, tone = 'info') {
+  if (!statusBanner) return;
+
+  window.clearTimeout(statusTimeoutId);
+
+  if (!message) {
+    statusBanner.textContent = '';
+    statusBanner.dataset.tone = '';
+    statusBanner.classList.remove('is-visible', 'status-info', 'status-success', 'status-warning');
+    statusBanner.hidden = true;
+    statusTimeoutId = null;
+    return;
+  }
+
+  statusBanner.hidden = false;
+  statusBanner.textContent = message;
+  statusBanner.dataset.tone = tone;
+  statusBanner.classList.remove('status-info', 'status-success', 'status-warning');
+  statusBanner.classList.add('is-visible', `status-${tone}`);
+  statusTimeoutId = window.setTimeout(() => {
+    showStatus('');
+  }, 12000);
+}
+
 function announceSessionCompletion(hour) {
   const label = formatHourLabel(hour);
   const message = `Great job! Focus session logged for ${label}.`;
@@ -367,6 +410,31 @@ function updateCalendarDate() {
     day: 'numeric',
   });
   calendarDateEl.textContent = formatter.format(new Date());
+}
+
+function scheduleDayRolloverCheck() {
+  window.setInterval(() => {
+    ensureTodayState({ announce: true });
+  }, DAY_ROLLOVER_INTERVAL_MS);
+}
+
+function ensureTodayState({ announce = false } = {}) {
+  const todayKey = currentDateKey();
+
+  if (todayKey === state.dateKey) {
+    return false;
+  }
+
+  state.dateKey = todayKey;
+  state.focusSessionsInCycle = 0;
+  loadDayState(todayKey);
+  updateCalendarDate();
+
+  if (announce) {
+    showStatus('A new day has started. The morning timeline has been reset.', 'info');
+  }
+
+  return true;
 }
 
 function loadSessions() {
