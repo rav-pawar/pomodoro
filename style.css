@@ -1,0 +1,369 @@
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  color-scheme: light dark;
+  --bg: #eef2ff;
+  --surface: #ffffff;
+  --surface-muted: rgba(255, 255, 255, 0.7);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --accent: #ef4444;
+  --accent-strong: #dc2626;
+  --timeline-bg: #0b0f19;
+  --timeline-line: rgba(148, 163, 184, 0.24);
+  --timeline-text: #e2e8f0;
+  --chip-bg: rgba(59, 130, 246, 0.14);
+  --chip-border: rgba(96, 165, 250, 0.55);
+  --chip-text: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #e2e8f0 0%, var(--bg) 45%, #fff 100%);
+  color: var(--text-primary);
+}
+
+main.app {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  grid-template-columns: minmax(280px, 3fr) minmax(260px, 2fr);
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.timer-panel,
+.calendar-panel {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 1.5rem;
+}
+
+.panel-header h1,
+.panel-header h2 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.timer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.phase-badge {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--accent-strong);
+}
+
+.phase-badge[data-phase='shortBreak'] {
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
+}
+
+.phase-badge[data-phase='longBreak'] {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+}
+
+.upcoming-text {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.timer-display {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  font-size: clamp(3.5rem, 10vw, 5.5rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.timer-display span {
+  min-width: 1ch;
+  text-align: center;
+}
+
+.timer-display .separator {
+  opacity: 0.35;
+  padding: 0 0.4rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.button-row button {
+  flex: 1 1 140px;
+  border-radius: 14px;
+  padding: 0.75rem 1.1rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.button-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
+.button-row .primary {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 15px 35px rgba(239, 68, 68, 0.35);
+}
+
+.button-row .primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.button-row .secondary {
+  background: #e0f2fe;
+  color: #1d4ed8;
+}
+
+.button-row .secondary:hover:not(:disabled) {
+  background: #bfdbfe;
+  transform: translateY(-1px);
+}
+
+.button-row .ghost {
+  background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: var(--text-primary);
+}
+
+.button-row .ghost:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings {
+  background: var(--surface-muted);
+  border-radius: 18px;
+  padding: 1.1rem 1.25rem;
+  display: grid;
+  gap: 1rem;
+  backdrop-filter: blur(8px);
+}
+
+.settings h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.settings-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.settings-field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.settings-field input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: #f8fafc;
+}
+
+.settings-field input:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.45);
+  outline-offset: 2px;
+}
+
+.settings-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.stats {
+  display: grid;
+  gap: 1rem;
+}
+
+.stats h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stats .highlight {
+  margin: 0;
+  font-size: clamp(2.1rem, 5vw, 3rem);
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.calendar-panel {
+  background: var(--timeline-bg);
+  color: var(--timeline-text);
+  padding: clamp(1.75rem, 4vw, 2.75rem);
+  position: relative;
+  overflow: hidden;
+}
+
+.calendar-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 55%);
+  pointer-events: none;
+}
+
+.calendar-heading {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.calendar-date {
+  margin: 0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.timeline {
+  display: grid;
+  gap: 0.65rem;
+  position: relative;
+  z-index: 1;
+}
+
+.hour-row {
+  display: grid;
+  grid-template-columns: 88px 1fr 52px;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.85rem 0;
+}
+
+.hour-row:not(:last-child) {
+  border-bottom: 1px solid var(--timeline-line);
+}
+
+.hour-label {
+  font-size: 0.95rem;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.hour-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.hour-line {
+  position: absolute;
+  inset: 50% 0 auto;
+  transform: translateY(-50%);
+  height: 1px;
+  background: var(--timeline-line);
+}
+
+.session-chips {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.session-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  color: var(--chip-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.hour-count {
+  justify-self: end;
+  font-weight: 600;
+  font-size: 1rem;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@media (max-width: 960px) {
+  main.app {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-panel {
+    order: -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .button-row {
+    flex-direction: column;
+  }
+
+  .button-row button {
+    width: 100%;
+  }
+
+  .hour-row {
+    grid-template-columns: 70px 1fr 40px;
+    gap: 0.75rem;
+  }
+}
