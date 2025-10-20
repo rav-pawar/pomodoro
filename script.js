@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'pomodoro-sessions-by-day-v1';
 const SETTINGS_KEY = 'pomodoro-settings-v1';
-const START_HOUR = 8;
-const END_HOUR = 12; // exclusive
+const START_HOUR = 0;
+const END_HOUR = 24; // exclusive
 const LONG_BREAK_INTERVAL = 4;
 const DAY_ROLLOVER_INTERVAL_MS = 60_000;
 
@@ -21,6 +21,7 @@ const state = {
   focusSessionsInCycle: 0,
   durations: { ...DEFAULT_SETTINGS },
   dateKey: currentDateKey(),
+  viewDateKey: currentDateKey(),
 };
 
 let statusTimeoutId = null;
@@ -36,6 +37,9 @@ const sessionsCountEl = document.getElementById('sessions-count');
 const calendarRowsEl = document.getElementById('calendar-rows');
 const rowTemplate = document.getElementById('hour-row-template');
 const calendarDateEl = document.getElementById('calendar-date');
+const prevDayButton = document.getElementById('prev-day');
+const nextDayButton = document.getElementById('next-day');
+const todayButton = document.getElementById('today-button');
 const settingsForm = document.getElementById('settings-form');
 const focusInput = document.getElementById('focus-duration');
 const shortBreakInput = document.getElementById('short-break-duration');
@@ -44,10 +48,11 @@ const statusBanner = document.getElementById('status-banner');
 
 initSettings();
 initCalendar();
-loadDayState(state.dateKey);
+loadDayState(state.viewDateKey);
 updateTimerDisplay(state.remainingSeconds);
 updatePhaseDisplay();
 updateCalendarDate();
+updateNavigationState();
 scheduleDayRolloverCheck();
 showStatus('');
 
@@ -55,6 +60,15 @@ startButton.addEventListener('click', handleStart);
 pauseButton.addEventListener('click', handlePauseToggle);
 resetButton.addEventListener('click', handleReset);
 settingsForm.addEventListener('input', handleSettingsChange);
+if (prevDayButton) {
+  prevDayButton.addEventListener('click', () => shiftViewByDays(-1));
+}
+if (nextDayButton) {
+  nextDayButton.addEventListener('click', () => shiftViewByDays(1));
+}
+if (todayButton) {
+  todayButton.addEventListener('click', () => setViewDate(state.dateKey));
+}
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.isRunning) {
@@ -179,8 +193,7 @@ function completePhase() {
   state.lastTick = null;
 
   if (state.phase === 'focus') {
-    const totalToday = recordCompletedSession();
-    refreshFocusCount(totalToday);
+    recordCompletedSession();
     state.focusSessionsInCycle += 1;
     const useLongBreak = state.focusSessionsInCycle >= LONG_BREAK_INTERVAL;
     if (useLongBreak) {
@@ -303,38 +316,37 @@ function initCalendar() {
 
 function loadDayState(key) {
   const sessionsByDay = loadSessions();
-  const data = sessionsByDay[key] ?? createEmptySlots();
-  updateCalendar(data);
-  const totalToday = countSessions(data);
-  refreshFocusCount(totalToday);
+  const data = normalizeSlots(sessionsByDay[key]);
+
+  if (key === state.viewDateKey) {
+    updateCalendar(data);
+  }
+
+  const totalForDay = countSessions(data);
+  refreshFocusCount(totalForDay, key);
 }
 
 function recordCompletedSession() {
   ensureTodayState();
   const sessionsByDay = loadSessions();
   const key = state.dateKey;
-
-  if (!sessionsByDay[key]) {
-    sessionsByDay[key] = createEmptySlots();
-  }
-
   const now = new Date();
   const slotHour = now.getHours();
 
-  if (slotHour >= START_HOUR && slotHour < END_HOUR) {
-    sessionsByDay[key][slotHour] += 1;
-    saveSessions(sessionsByDay);
-    updateCalendar(sessionsByDay[key]);
-    showStatus(`Focus session logged for ${formatHourLabel(slotHour)}.`, 'success');
-    announceSessionCompletion(slotHour);
-    return countSessions(sessionsByDay[key]);
+  const dayData = normalizeSlots(sessionsByDay[key]);
+  dayData[slotHour] = (dayData[slotHour] ?? 0) + 1;
+  sessionsByDay[key] = dayData;
+  saveSessions(sessionsByDay);
+
+  if (state.viewDateKey === key) {
+    updateCalendar(dayData);
   }
 
-  showStatus(
-    'Session completed outside of 8 AM – 12 PM. It will not appear in the morning timeline.',
-    'info',
-  );
-  return countSessions(sessionsByDay[key]);
+  const total = countSessions(dayData);
+  refreshFocusCount(total, key);
+  showStatus(`Focus session logged for ${formatHourLabel(slotHour)}.`, 'success');
+  announceSessionCompletion(slotHour);
+  return total;
 }
 
 function updateCalendar(data) {
@@ -363,13 +375,66 @@ function updateCalendar(data) {
   });
 }
 
-function refreshFocusCount(total) {
-  state.focusSessionsToday = total;
-  sessionsCountEl.textContent = total.toString();
+function refreshFocusCount(total, key) {
+  if (key === state.viewDateKey) {
+    sessionsCountEl.textContent = total.toString();
+  }
+
+  if (key === state.dateKey) {
+    state.focusSessionsToday = total;
+  }
 }
 
 function countSessions(slots) {
   return Object.values(slots).reduce((sum, count) => sum + count, 0);
+}
+
+function shiftViewByDays(days) {
+  if (!Number.isFinite(days) || days === 0) {
+    return;
+  }
+
+  const targetDate = dateFromKey(state.viewDateKey);
+  targetDate.setDate(targetDate.getDate() + days);
+  const nextKey = keyFromDate(targetDate);
+
+  if (compareDateKeys(nextKey, state.dateKey) > 0) {
+    return;
+  }
+
+  setViewDate(nextKey);
+}
+
+function setViewDate(key) {
+  if (!key) {
+    key = state.dateKey;
+  }
+
+  if (compareDateKeys(key, state.dateKey) > 0) {
+    key = state.dateKey;
+  }
+
+  if (state.viewDateKey === key) {
+    loadDayState(key);
+    updateCalendarDate();
+    updateNavigationState();
+    return;
+  }
+
+  state.viewDateKey = key;
+  loadDayState(key);
+  updateCalendarDate();
+  updateNavigationState();
+}
+
+function updateNavigationState() {
+  if (nextDayButton) {
+    nextDayButton.disabled = compareDateKeys(state.viewDateKey, state.dateKey) >= 0;
+  }
+
+  if (todayButton) {
+    todayButton.disabled = state.viewDateKey === state.dateKey;
+  }
 }
 
 function showStatus(message, tone = 'info') {
@@ -412,12 +477,15 @@ function announceSessionCompletion(hour) {
 }
 
 function updateCalendarDate() {
+  const viewDate = dateFromKey(state.viewDateKey);
   const formatter = new Intl.DateTimeFormat(undefined, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   });
-  calendarDateEl.textContent = formatter.format(new Date());
+  const formatted = formatter.format(viewDate);
+  const suffix = state.viewDateKey === state.dateKey ? ' · Today' : '';
+  calendarDateEl.textContent = `${formatted}${suffix}`;
 }
 
 function scheduleDayRolloverCheck() {
@@ -433,13 +501,33 @@ function ensureTodayState({ announce = false } = {}) {
     return false;
   }
 
+  const previousToday = state.dateKey;
   state.dateKey = todayKey;
   state.focusSessionsInCycle = 0;
-  loadDayState(todayKey);
+  const sessionsByDay = loadSessions();
+  const todaysData = normalizeSlots(sessionsByDay[todayKey]);
+
+  if (state.viewDateKey === previousToday) {
+    state.viewDateKey = todayKey;
+  }
+
+  refreshFocusCount(countSessions(todaysData), todayKey);
+
+  if (state.viewDateKey === todayKey) {
+    updateCalendar(todaysData);
+  } else {
+    loadDayState(state.viewDateKey);
+  }
+
   updateCalendarDate();
+  updateNavigationState();
 
   if (announce) {
-    showStatus('A new day has started. The morning timeline has been reset.', 'info');
+    const message =
+      state.viewDateKey === state.dateKey
+        ? 'A new day has started. The timeline has been reset for today.'
+        : 'A new day has started. Jump to today to review your latest sessions.';
+    showStatus(message, 'info');
   }
 
   return true;
@@ -471,6 +559,24 @@ function createEmptySlots() {
   return slots;
 }
 
+function normalizeSlots(rawSlots = {}) {
+  const slots = createEmptySlots();
+
+  if (!rawSlots || typeof rawSlots !== 'object') {
+    return slots;
+  }
+
+  Object.entries(rawSlots).forEach(([hour, value]) => {
+    const numericHour = Number(hour);
+    if (Number.isFinite(numericHour) && numericHour >= START_HOUR && numericHour < END_HOUR) {
+      const numericValue = Number(value);
+      slots[numericHour] = Number.isFinite(numericValue) ? numericValue : 0;
+    }
+  });
+
+  return slots;
+}
+
 function formatHourLabel(hour) {
   const date = new Date();
   date.setHours(hour, 0, 0, 0);
@@ -483,6 +589,30 @@ function formatHourLabel(hour) {
 function currentDateKey() {
   const now = new Date();
   return [now.getFullYear(), now.getMonth() + 1, now.getDate()].join('-');
+}
+
+function dateFromKey(key) {
+  const [year, month, day] = key.split('-').map((part) => Number.parseInt(part, 10));
+  const date = new Date();
+  date.setFullYear(year, (month ?? 1) - 1, day ?? 1);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function keyFromDate(date) {
+  const normalized = new Date(date.getTime());
+  normalized.setHours(0, 0, 0, 0);
+  return [normalized.getFullYear(), normalized.getMonth() + 1, normalized.getDate()].join('-');
+}
+
+function compareDateKeys(a, b) {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  const dateA = dateFromKey(a).getTime();
+  const dateB = dateFromKey(b).getTime();
+  if (dateA === dateB) return 0;
+  return dateA > dateB ? 1 : -1;
 }
 
 function loadSettings() {

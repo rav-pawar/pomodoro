@@ -82,7 +82,8 @@
 
         <div class="stats">
           <div>
-            <h2>Focus sessions completed today</h2>
+            <h2>Focus sessions completed</h2>
+            <p class="subtitle">For the day currently shown in the timeline.</p>
             <p id="sessions-count" class="highlight">0</p>
           </div>
         </div>
@@ -98,11 +99,36 @@
       <section class="calendar-panel" aria-labelledby="calendar-title">
         <header class="panel-header">
           <div class="calendar-heading">
-            <p class="calendar-date" id="calendar-date"></p>
-            <h2 id="calendar-title">Morning timeline</h2>
+            <div class="calendar-toolbar">
+              <button
+                id="prev-day"
+                class="calendar-nav"
+                type="button"
+                aria-label="View previous day"
+              >
+                ‹
+              </button>
+              <div class="calendar-title-group">
+                <p class="calendar-date" id="calendar-date"></p>
+                <h2 id="calendar-title">Daily timeline</h2>
+              </div>
+              <button
+                id="next-day"
+                class="calendar-nav"
+                type="button"
+                aria-label="View next day"
+              >
+                ›
+              </button>
+            </div>
+            <div class="calendar-toolbar-secondary">
+              <button id="today-button" class="calendar-today" type="button">
+                Jump to today
+              </button>
+            </div>
             <p class="subtitle">
-              Focus sessions between 8:00 AM and 12:00 PM are pinned to the
-              timeline below.
+              Review every focus session you completed throughout the day and
+              browse previous dates to spot trends.
             </p>
           </div>
         </header>
