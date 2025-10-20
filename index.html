@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pomodoro Planner</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="timer-panel">
+        <header class="panel-header">
+          <h1>Pomodoro Focus Timer</h1>
+          <p class="subtitle">
+            Stay on task with 25-minute focus intervals followed by short breaks.
+          </p>
+        </header>
+
+        <div class="timer-display" aria-live="polite">
+          <span id="minutes">25</span>
+          <span class="separator">:</span>
+          <span id="seconds">00</span>
+        </div>
+
+        <div class="button-row">
+          <button id="start" class="primary">Start</button>
+          <button id="pause" class="secondary" disabled>Pause</button>
+          <button id="reset" class="ghost">Reset</button>
+        </div>
+
+        <div class="stats">
+          <div>
+            <h2>Sessions Completed Today</h2>
+            <p id="sessions-count" class="highlight">0</p>
+          </div>
+          <div>
+            <h2>Upcoming Break</h2>
+            <p>Take a 5-minute break after each session.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="calendar-panel" aria-labelledby="calendar-title">
+        <header class="panel-header">
+          <h2 id="calendar-title">Morning Pomodoro Log</h2>
+          <p class="subtitle">Track sessions between 8:00 AM and 12:00 PM.</p>
+        </header>
+
+        <div class="day-calendar" role="table">
+          <div class="calendar-header" role="row">
+            <span role="columnheader">Time</span>
+            <span role="columnheader">Completed Pomodoros</span>
+          </div>
+          <div id="calendar-rows"></div>
+        </div>
+
+        <div class="legend">
+          <span class="legend-dot"></span>
+          <p>Completed sessions update automatically when a timer finishes.</p>
+        </div>
+      </section>
+    </main>
+
+    <template id="calendar-row-template">
+      <div class="calendar-row" role="row">
+        <span class="time-cell" role="rowheader"></span>
+        <div class="session-cell" role="cell">
+          <div class="session-bar" aria-hidden="true"></div>
+          <span class="session-count">0</span>
+        </div>
+      </div>
+    </template>
+
+    <script src="script.js" type="module"></script>
+  </body>
+</html>
