@@ -1,15 +1,14 @@
 # Pomodoro Planner
 
-A lightweight in-browser Pomodoro timer that tracks completed focus sessions on a morning timeline from 8:00 AM to 12:00 PM.
+A lightweight in-browser Pomodoro timer that tracks completed focus sessions on a morning calendar from 8:00 AM to 12:00 PM.
 
 ## Getting started
 
-Open `index.html` in any modern browser. Session progress and duration preferences are stored in `localStorage`, so completed Pomodoros for the day and your chosen timings stay visible if you refresh the page.
+Just open `index.html` in any modern browser. Session progress is stored in `localStorage`, so completed Pomodoros for the day will stay visible if you refresh the page.
 
 ## Features
 
-- Configurable focus, short break, and long break durations with automatic long breaks every fourth session.
-- Start, pause/resume, reset, and automatic phase switching between focus and breaks.
-- Morning timeline styled like a day calendar that highlights how many Pomodoros were completed each hour between 8 AM and noon.
-- Inline status banner highlights logged sessions, daily timeline resets, and other updates without intrusive alerts.
-- Local persistence for both timeline history (per day) and your preferred session lengths.
+- 25-minute Pomodoro timer with start, pause/resume, and reset controls.
+- Automatic logging of completed sessions into hourly slots between 8 AM and noon.
+- Visual morning calendar that displays how many Pomodoros were completed per hour block.
+- Local persistence so your progress for the current day is preserved.

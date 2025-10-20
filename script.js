@@ -1,68 +1,36 @@
+const POMODORO_MINUTES = 25;
+const POMODORO_SECONDS = POMODORO_MINUTES * 60;
 const STORAGE_KEY = 'pomodoro-sessions-by-day-v1';
-const SETTINGS_KEY = 'pomodoro-settings-v1';
 const START_HOUR = 8;
 const END_HOUR = 12; // exclusive
-const LONG_BREAK_INTERVAL = 4;
-const DAY_ROLLOVER_INTERVAL_MS = 60_000;
-
-const DEFAULT_SETTINGS = {
-  focus: 25,
-  shortBreak: 5,
-  longBreak: 15,
-};
 
 const state = {
-  remainingSeconds: 0,
+  remainingSeconds: POMODORO_SECONDS,
   timerId: null,
   isRunning: false,
   lastTick: null,
-  phase: 'focus',
-  focusSessionsToday: 0,
-  focusSessionsInCycle: 0,
-  durations: { ...DEFAULT_SETTINGS },
-  dateKey: currentDateKey(),
 };
-
-let statusTimeoutId = null;
 
 const minutesEl = document.getElementById('minutes');
 const secondsEl = document.getElementById('seconds');
-const phaseLabelEl = document.getElementById('phase-label');
-const upcomingLabelEl = document.getElementById('upcoming-label');
 const startButton = document.getElementById('start');
 const pauseButton = document.getElementById('pause');
 const resetButton = document.getElementById('reset');
 const sessionsCountEl = document.getElementById('sessions-count');
 const calendarRowsEl = document.getElementById('calendar-rows');
-const rowTemplate = document.getElementById('hour-row-template');
-const calendarDateEl = document.getElementById('calendar-date');
-const settingsForm = document.getElementById('settings-form');
-const focusInput = document.getElementById('focus-duration');
-const shortBreakInput = document.getElementById('short-break-duration');
-const longBreakInput = document.getElementById('long-break-duration');
-const statusBanner = document.getElementById('status-banner');
+const rowTemplate = document.getElementById('calendar-row-template');
 
-initSettings();
 initCalendar();
-loadDayState(state.dateKey);
+restoreState();
 updateTimerDisplay(state.remainingSeconds);
-updatePhaseDisplay();
-updateCalendarDate();
-scheduleDayRolloverCheck();
-showStatus('');
 
 startButton.addEventListener('click', handleStart);
 pauseButton.addEventListener('click', handlePauseToggle);
 resetButton.addEventListener('click', handleReset);
-settingsForm.addEventListener('input', handleSettingsChange);
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.isRunning) {
     state.lastTick = Date.now();
-  }
-
-  if (!document.hidden) {
-    ensureTodayState({ announce: true });
   }
 });
 
@@ -72,18 +40,15 @@ function handleStart() {
   state.isRunning = true;
   startButton.disabled = true;
   pauseButton.disabled = false;
-  pauseButton.textContent = 'Pause';
-  state.lastTick = null;
   tick();
 }
 
 function handlePauseToggle() {
   if (!state.isRunning) {
-    // resume current phase
+    // resume
     state.isRunning = true;
-    startButton.disabled = true;
     pauseButton.textContent = 'Pause';
-    state.lastTick = null;
+    startButton.disabled = true;
     tick();
     return;
   }
@@ -100,45 +65,12 @@ function handleReset() {
   window.clearTimeout(state.timerId);
   state.timerId = null;
   state.isRunning = false;
+  state.remainingSeconds = POMODORO_SECONDS;
   state.lastTick = null;
-  state.phase = 'focus';
-  state.focusSessionsInCycle = 0;
-  state.remainingSeconds = durationFor('focus');
   startButton.disabled = false;
   pauseButton.disabled = true;
   pauseButton.textContent = 'Pause';
   updateTimerDisplay(state.remainingSeconds);
-  updatePhaseDisplay();
-  showStatus('');
-}
-
-function handleSettingsChange(event) {
-  if (!(event.target instanceof HTMLInputElement)) return;
-
-  const updated = {
-    focus: normalizeMinutes(focusInput.value, DEFAULT_SETTINGS.focus),
-    shortBreak: normalizeMinutes(
-      shortBreakInput.value,
-      DEFAULT_SETTINGS.shortBreak,
-    ),
-    longBreak: normalizeMinutes(longBreakInput.value, DEFAULT_SETTINGS.longBreak),
-  };
-
-  state.durations = updated;
-  focusInput.value = state.durations.focus.toString();
-  shortBreakInput.value = state.durations.shortBreak.toString();
-  longBreakInput.value = state.durations.longBreak.toString();
-  saveSettings(updated);
-  const currentDuration = durationFor(state.phase);
-
-  if (state.isRunning) {
-    state.remainingSeconds = Math.min(state.remainingSeconds, currentDuration);
-  } else {
-    state.remainingSeconds = currentDuration;
-  }
-
-  updateTimerDisplay(state.remainingSeconds);
-  updatePhaseDisplay();
 }
 
 function tick() {
@@ -157,53 +89,11 @@ function tick() {
   }
 
   if (state.remainingSeconds <= 0) {
-    completePhase();
+    completeSession();
     return;
   }
 
   state.timerId = window.setTimeout(tick, 250);
-}
-
-function completePhase() {
-  window.clearTimeout(state.timerId);
-  state.timerId = null;
-  state.isRunning = false;
-  state.lastTick = null;
-
-  if (state.phase === 'focus') {
-    const totalToday = recordCompletedSession();
-    refreshFocusCount(totalToday);
-    state.focusSessionsInCycle += 1;
-    const useLongBreak = state.focusSessionsInCycle >= LONG_BREAK_INTERVAL;
-    if (useLongBreak) {
-      state.focusSessionsInCycle = 0;
-    }
-    const nextPhase = useLongBreak ? 'longBreak' : 'shortBreak';
-    transitionToPhase(nextPhase, true);
-  } else {
-    transitionToPhase('focus', true);
-  }
-}
-
-function transitionToPhase(nextPhase, autoStart) {
-  state.phase = nextPhase;
-  state.remainingSeconds = durationFor(nextPhase);
-  state.lastTick = null;
-  updateTimerDisplay(state.remainingSeconds);
-  updatePhaseDisplay();
-
-  if (autoStart) {
-    state.isRunning = true;
-    startButton.disabled = true;
-    pauseButton.disabled = false;
-    pauseButton.textContent = 'Pause';
-    tick();
-  } else {
-    state.isRunning = false;
-    startButton.disabled = false;
-    pauseButton.disabled = true;
-    pauseButton.textContent = 'Pause';
-  }
 }
 
 function updateTimerDisplay(totalSeconds) {
@@ -218,93 +108,55 @@ function updateTimerDisplay(totalSeconds) {
   secondsEl.textContent = seconds;
 }
 
-function updatePhaseDisplay() {
-  const labelMap = {
-    focus: 'Focus Session',
-    shortBreak: 'Short Break',
-    longBreak: 'Long Break',
-  };
+function completeSession() {
+  window.clearTimeout(state.timerId);
+  state.timerId = null;
+  state.isRunning = false;
+  state.remainingSeconds = POMODORO_SECONDS;
+  state.lastTick = null;
+  startButton.disabled = false;
+  pauseButton.disabled = true;
+  pauseButton.textContent = 'Pause';
+  updateTimerDisplay(state.remainingSeconds);
 
-  phaseLabelEl.textContent = labelMap[state.phase];
-  phaseLabelEl.dataset.phase = state.phase;
-
-  const nextPhase = computeNextPhase();
-  if (nextPhase) {
-    const nextLabel = labelMap[nextPhase];
-    const durationMinutes = durationFor(nextPhase) / 60;
-    upcomingLabelEl.textContent = `Next: ${nextLabel} · ${durationMinutes} min`;
-  } else {
-    upcomingLabelEl.textContent = '';
-  }
-
-  if (!state.isRunning) {
-    const label = state.phase === 'focus' ? 'Start Focus' : 'Start Break';
-    startButton.textContent = label;
-  }
-}
-
-function computeNextPhase() {
-  if (state.phase === 'focus') {
-    const willTriggerLongBreak =
-      state.focusSessionsInCycle >= LONG_BREAK_INTERVAL - 1;
-    return willTriggerLongBreak ? 'longBreak' : 'shortBreak';
-  }
-
-  return 'focus';
-}
-
-function durationFor(phase) {
-  switch (phase) {
-    case 'shortBreak':
-      return state.durations.shortBreak * 60;
-    case 'longBreak':
-      return state.durations.longBreak * 60;
-    default:
-      return state.durations.focus * 60;
-  }
-}
-
-function initSettings() {
-  const saved = loadSettings();
-  state.durations = { ...DEFAULT_SETTINGS, ...saved };
-
-  focusInput.value = state.durations.focus.toString();
-  shortBreakInput.value = state.durations.shortBreak.toString();
-  longBreakInput.value = state.durations.longBreak.toString();
-
-  state.remainingSeconds = durationFor('focus');
+  recordCompletedSession();
 }
 
 function initCalendar() {
   calendarRowsEl.innerHTML = '';
 
   for (let hour = START_HOUR; hour < END_HOUR; hour += 1) {
-    const fragment = rowTemplate.content.cloneNode(true);
-    const row = fragment.querySelector('.hour-row');
-    const label = fragment.querySelector('.hour-label');
-    const chips = fragment.querySelector('.session-chips');
-    const count = fragment.querySelector('.hour-count');
+    const clone = rowTemplate.content.cloneNode(true);
+    const row = clone.querySelector('.calendar-row');
+    const timeCell = clone.querySelector('.time-cell');
+    const sessionCell = clone.querySelector('.session-cell');
+    const countSpan = clone.querySelector('.session-count');
 
-    row.dataset.hour = hour.toString();
-    label.textContent = formatHourLabel(hour);
-    chips.innerHTML = '';
-    count.textContent = '0';
-    calendarRowsEl.appendChild(fragment);
+    const label = formatHourLabel(hour);
+    row.dataset.hour = hour;
+    timeCell.textContent = label;
+    sessionCell.dataset.progress = '0';
+    sessionCell.style.setProperty('--progress', 0);
+    countSpan.textContent = '0';
+    calendarRowsEl.appendChild(clone);
   }
 }
 
-function loadDayState(key) {
+function restoreState() {
   const sessionsByDay = loadSessions();
-  const data = sessionsByDay[key] ?? createEmptySlots();
+  const todayKey = currentDateKey();
+  const data = sessionsByDay[todayKey] ?? createEmptySlots();
+
   updateCalendar(data);
-  const totalToday = countSessions(data);
-  refreshFocusCount(totalToday);
+  sessionsCountEl.textContent = Object.values(data).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
 }
 
 function recordCompletedSession() {
-  ensureTodayState();
   const sessionsByDay = loadSessions();
-  const key = state.dateKey;
+  const key = currentDateKey();
 
   if (!sessionsByDay[key]) {
     sessionsByDay[key] = createEmptySlots();
@@ -316,81 +168,38 @@ function recordCompletedSession() {
   if (slotHour >= START_HOUR && slotHour < END_HOUR) {
     sessionsByDay[key][slotHour] += 1;
     saveSessions(sessionsByDay);
-    updateCalendar(sessionsByDay[key]);
-    showStatus(`Focus session logged for ${formatHourLabel(slotHour)}.`, 'success');
     announceSessionCompletion(slotHour);
-    return countSessions(sessionsByDay[key]);
+  } else {
+    alert(
+      'Session completed outside of 8 AM – 12 PM. It will not appear in the morning calendar.',
+    );
   }
 
-  showStatus(
-    'Session completed outside of 8 AM – 12 PM. It will not appear in the morning timeline.',
-    'info',
+  updateCalendar(sessionsByDay[key]);
+  sessionsCountEl.textContent = Object.values(sessionsByDay[key]).reduce(
+    (sum, count) => sum + count,
+    0,
   );
-  return countSessions(sessionsByDay[key]);
 }
 
 function updateCalendar(data) {
-  const rows = calendarRowsEl.querySelectorAll('.hour-row');
+  const rows = calendarRowsEl.querySelectorAll('.calendar-row');
   rows.forEach((row) => {
     const hour = Number(row.dataset.hour);
     const count = data[hour] ?? 0;
-    const chipsContainer = row.querySelector('.session-chips');
-    const countEl = row.querySelector('.hour-count');
+    const cell = row.querySelector('.session-cell');
+    const countEl = row.querySelector('.session-count');
 
-    chipsContainer.innerHTML = '';
-
-    for (let index = 0; index < count; index += 1) {
-      const chip = document.createElement('span');
-      chip.className = 'session-chip';
-      chip.setAttribute(
-        'aria-label',
-        `Focus session ${index + 1} completed during this hour`,
-      );
-      chip.setAttribute('role', 'listitem');
-      chip.textContent = `${index + 1}`;
-      chipsContainer.appendChild(chip);
-    }
-
+    const progress = Math.min(count / 4, 1); // assume 4 pomodoros max visual fill
+    cell.dataset.progress = progress.toFixed(2);
+    cell.style.setProperty('--progress', progress.toFixed(2));
     countEl.textContent = count.toString();
   });
 }
 
-function refreshFocusCount(total) {
-  state.focusSessionsToday = total;
-  sessionsCountEl.textContent = total.toString();
-}
-
-function countSessions(slots) {
-  return Object.values(slots).reduce((sum, count) => sum + count, 0);
-}
-
-function showStatus(message, tone = 'info') {
-  if (!statusBanner) return;
-
-  window.clearTimeout(statusTimeoutId);
-
-  if (!message) {
-    statusBanner.textContent = '';
-    statusBanner.dataset.tone = '';
-    statusBanner.classList.remove('is-visible', 'status-info', 'status-success', 'status-warning');
-    statusBanner.hidden = true;
-    statusTimeoutId = null;
-    return;
-  }
-
-  statusBanner.hidden = false;
-  statusBanner.textContent = message;
-  statusBanner.dataset.tone = tone;
-  statusBanner.classList.remove('status-info', 'status-success', 'status-warning');
-  statusBanner.classList.add('is-visible', `status-${tone}`);
-  statusTimeoutId = window.setTimeout(() => {
-    showStatus('');
-  }, 12000);
-}
-
 function announceSessionCompletion(hour) {
   const label = formatHourLabel(hour);
-  const message = `Great job! Focus session logged for ${label}.`;
+  const message = `Great job! Pomodoro completed and logged for ${label}.`;
   window.requestAnimationFrame(() => {
     const liveRegion = document.createElement('div');
     liveRegion.setAttribute('aria-live', 'polite');
@@ -401,40 +210,6 @@ function announceSessionCompletion(hour) {
       liveRegion.remove();
     }, 1000);
   });
-}
-
-function updateCalendarDate() {
-  const formatter = new Intl.DateTimeFormat(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-  calendarDateEl.textContent = formatter.format(new Date());
-}
-
-function scheduleDayRolloverCheck() {
-  window.setInterval(() => {
-    ensureTodayState({ announce: true });
-  }, DAY_ROLLOVER_INTERVAL_MS);
-}
-
-function ensureTodayState({ announce = false } = {}) {
-  const todayKey = currentDateKey();
-
-  if (todayKey === state.dateKey) {
-    return false;
-  }
-
-  state.dateKey = todayKey;
-  state.focusSessionsInCycle = 0;
-  loadDayState(todayKey);
-  updateCalendarDate();
-
-  if (announce) {
-    showStatus('A new day has started. The morning timeline has been reset.', 'info');
-  }
-
-  return true;
 }
 
 function loadSessions() {
@@ -475,30 +250,4 @@ function formatHourLabel(hour) {
 function currentDateKey() {
   const now = new Date();
   return [now.getFullYear(), now.getMonth() + 1, now.getDate()].join('-');
-}
-
-function loadSettings() {
-  try {
-    const stored = window.localStorage.getItem(SETTINGS_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch (error) {
-    console.error('Failed to load settings', error);
-    return {};
-  }
-}
-
-function saveSettings(settings) {
-  try {
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  } catch (error) {
-    console.error('Failed to save settings', error);
-  }
-}
-
-function normalizeMinutes(value, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
 }
